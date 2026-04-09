@@ -1375,7 +1375,10 @@ function carregarHistorico() {
       } else {
         var nomeActual = S.utilizador ? S.utilizador.nome : '';
         S.hist_lista = todos.filter(function(g) {
-          return (g.colaborador || '') === nomeActual;
+          var colab = (g.colaborador || '').trim();
+          // Guias antigas sem colaborador — só o gestor vê
+          if (!colab) return false;
+          return colab === nomeActual;
         });
       }
       var arm = {PRINCIPAL:'Principal',SECUNDARIO:'Secund.',TERCIARIO:'Terciário'};
