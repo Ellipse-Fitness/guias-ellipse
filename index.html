@@ -674,21 +674,26 @@ input[type="datetime-local"] { color-scheme: dark; }
 // ═══════════════════════════════════════════════════════
 // API — wrapper fetch para o Apps Script REST
 // ═══════════════════════════════════════════════════════
-var API_URL = 'https://script.google.com/macros/s/AKfycbx9Eh_b6WZ8ewFY_S64mpLGk47kTeCsIEqQ9HAQomvBz0U1pIW8ygR4_qQlBeHYC8uegw/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbzo8nTJItO42UIvGHJ7su2jINfD6cyiBIZZC8YDV0n-mMBIX4kUbJLUOkjl9QvltxX-vg/exec';
 
 function apiGet(action, params) {
   var url = API_URL + '?action=' + action;
   if (params) {
     Object.keys(params).forEach(function(k) { url += '&' + k + '=' + encodeURIComponent(params[k]); });
   }
-  return fetch(url).then(function(r) { return r.json(); });
+  return fetch(url, {
+    redirect: 'follow',
+    credentials: 'omit'
+  }).then(function(r) { return r.json(); });
 }
 
 function apiPost(action, payload) {
-  return fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: action, payload: payload })
+  // Apps Script não suporta POST com CORS de origens externas
+  // Usar GET com payload codificado como parâmetro
+  var url = API_URL + '?action=' + action + '&payload=' + encodeURIComponent(JSON.stringify(payload));
+  return fetch(url, {
+    redirect: 'follow',
+    credentials: 'omit'
   }).then(function(r) { return r.json(); });
 }
 
@@ -1189,7 +1194,6 @@ function carregarHistorico() {
       list.querySelectorAll('.hist-item').forEach(function(el) {
         el.addEventListener('click', function() { abrirDetalhe(parseInt(this.getAttribute('data-idx'))); });
       });
-    })
   }).catch(function() {
     list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:30px 0">Erro ao carregar</div>';
   });
