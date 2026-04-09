@@ -492,7 +492,7 @@ input[type="datetime-local"] { color-scheme: dark; }
         <div class="section-title">Empresa</div>
         <div class="seg">
           <button class="seg-btn active" id="seg-ellipse">Ellipse Fitness</button>
-          <button class="seg-btn" id="seg-yourfit">Yourfit</button>
+          <button class="seg-btn" id="seg-yourfit" disabled style="opacity:0.3;cursor:not-allowed">Yourfit</button>
         </div>
       </div>
 
@@ -500,7 +500,7 @@ input[type="datetime-local"] { color-scheme: dark; }
         <div class="section-title">Tipo de Guia</div>
         <div class="seg">
           <button class="seg-btn active" id="seg-ativos">Movimentação Ativos</button>
-          <button class="seg-btn" id="seg-transporte">Transporte</button>
+          <button class="seg-btn" id="seg-transporte" disabled style="opacity:0.3;cursor:not-allowed">Transporte (brevemente)</button>
         </div>
       </div>
 
@@ -627,7 +627,7 @@ input[type="datetime-local"] { color-scheme: dark; }
       <div class="card">
         <div class="field">
           <label class="field-label">Início de Transporte</label>
-          <input type="datetime-local" class="field-input" id="inp-inicio" step="300">
+          <input type="datetime-local" class="field-input" id="inp-inicio" step="60">
         </div>
       </div>
 
@@ -1223,12 +1223,11 @@ function submeterGuia() {
   if (S.artigos.length === 0) { toast('Adiciona pelo menos um artigo'); return; }
   var inicio = document.getElementById('inp-inicio').value;
   if (!inicio) { toast('Define o início de transporte'); return; }
-  // Arredondar para múltiplo de 5 min (para cima)
+  // Adicionar 2 minutos ao início de transporte para dar tempo de preenchimento
   (function() {
     var p=inicio.split('T'), dp=p[0].split('-'), hp=(p[1]||'00:00').split(':');
     var d=new Date(+dp[0],+dp[1]-1,+dp[2],+hp[0],+hp[1]);
-    var r=d.getMinutes()%5;
-    if(r!==0) d.setMinutes(d.getMinutes()+(5-r));
+    d.setMinutes(d.getMinutes()+2);
     d.setSeconds(0); d.setMilliseconds(0);
     d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
     inicio=d.toISOString().slice(0,16);
@@ -1371,9 +1370,14 @@ function carregarHistorico() {
   apiGet('historico').then(function(data) {
       var todos = data || [];
       // Gestor vê tudo, colaborador vê só as suas
-      S.hist_lista = (S.utilizador && S.utilizador.gestor)
-        ? todos
-        : todos.filter(function(g) { return g.colaborador === (S.utilizador ? S.utilizador.nome : ''); });
+      if (S.utilizador && S.utilizador.gestor) {
+        S.hist_lista = todos;
+      } else {
+        var nomeActual = S.utilizador ? S.utilizador.nome : '';
+        S.hist_lista = todos.filter(function(g) {
+          return (g.colaborador || '') === nomeActual;
+        });
+      }
       var arm = {PRINCIPAL:'Principal',SECUNDARIO:'Secund.',TERCIARIO:'Terciário'};
       if (!data || data.length === 0) {
         list.innerHTML = '<div style="color:var(--muted);font-size:14px;text-align:center;padding:40px 0">Sem guias</div>'; return;
@@ -1388,7 +1392,8 @@ function carregarHistorico() {
             '<span class="hist-badge ' + b.cls + '">' + b.label + '</span>' +
           '</div>' +
           '<div class="hist-rota"><span>' + esc(cl) + '</span><span style="color:var(--muted)">→</span><span>' + esc(dl) + '</span></div>' +
-          (g.codigo_at ? '<div class="hist-at">AT: ' + esc(g.codigo_at) + '</div>' : '') +
+          (g.numero_guia ? '<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">' + esc(g.numero_guia) + '</div>' : '') +
+          (g.codigo_at && g.codigo_at !== '' ? '<div class="hist-at">AT: ' + esc(g.codigo_at) + '</div>' : '') +
           '<div class="hist-data">' + esc(g.inicio || g.criado || '') + '</div>' +
         '</div>';
       }).join('');
