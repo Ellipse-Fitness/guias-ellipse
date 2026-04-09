@@ -687,6 +687,7 @@ function apiGet(action, params) {
   }).then(function(r) { return r.json(); });
 }
 
+
 function apiPost(action, payload) {
   // Apps Script não suporta POST com CORS de origens externas
   // Usar GET com payload codificado como parâmetro
@@ -696,6 +697,7 @@ function apiPost(action, payload) {
     credentials: 'omit'
   }).then(function(r) { return r.json(); });
 }
+
 
 var S = {
   empresa: 'ELLIPSE',
@@ -997,32 +999,61 @@ function limparCliente() {
 // ════════════════════════════════════════════════════════
 function processarFoto(input, tipo) {
   if (!input.files || !input.files[0]) return;
-  var file  = input.files[0];
-  var btn   = document.getElementById(tipo === 'carga' ? 'btn-foto-carga' : 'btn-foto-desc');
-  var orig  = btn.innerHTML;
+  var file = input.files[0];
+  var btn  = document.getElementById(tipo === 'carga' ? 'btn-foto-carga' : 'btn-foto-desc');
+  var orig = btn.innerHTML;
   btn.classList.add('loading');
   btn.innerHTML = 'A analisar imagem...';
+
   var reader = new FileReader();
   reader.onload = function(e) {
     var b64  = e.target.result.split(',')[1];
     var mime = file.type || 'image/jpeg';
-    apiPost('extrairMorada', {base64: b64, mimeType: mime}).then(function(r) {
+
+    // Chamar Gemini directamente do browser (sem passar pelo Apps Script)
+    var GEMINI_KEY = 'AIzaSyDS47v0MCHJQEUIzXlFgGKVMGMGlNb2uJo';
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_KEY;
+    var prompt = 'Analisa esta imagem e extrai a morada postal portuguesa. Responde APENAS com JSON puro sem backticks: {"morada":"rua e numero","cp":"XXXX-XXX","localidade":"cidade"}. Se nao encontrares algum campo deixa string vazia.';
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { inline_data: { mime_type: mime, data: b64 } },
+          { text: prompt }
+        ]}],
+        generationConfig: { temperature: 0, maxOutputTokens: 200 }
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       btn.classList.remove('loading'); btn.innerHTML = orig; input.value = '';
-      if (r.ok) {
-        var p = tipo === 'carga' ? 'inp-carga-' : 'inp-desc-';
-        if (r.morada)     document.getElementById(p + 'morada').value = r.morada;
-        if (r.cp)         document.getElementById(p + 'cp').value     = r.cp;
-        if (r.localidade) document.getElementById(p + 'loc').value    = r.localidade;
+      try {
+        var parts = data.candidates[0].content.parts;
+        var texto = '';
+        for (var i = 0; i < parts.length; i++) {
+          if (!parts[i].thought) texto += (parts[i].text || '');
+        }
+        texto = texto.replace(/```json/gi,'').replace(/```/g,'').trim();
+        var ini = texto.indexOf('{'), fim = texto.lastIndexOf('}');
+        var r2  = JSON.parse(texto.substring(ini, fim+1));
+        var p   = tipo === 'carga' ? 'inp-carga-' : 'inp-desc-';
+        if (r2.morada)     document.getElementById(p+'morada').value = r2.morada;
+        if (r2.cp)         document.getElementById(p+'cp').value     = r2.cp;
+        if (r2.localidade) document.getElementById(p+'loc').value    = r2.localidade;
         toast('Morada preenchida');
-      } else { toast('Não foi possível extrair a morada'); }
-    }).catch(function() { btn.classList.remove('loading'); btn.innerHTML = orig; input.value = ''; toast('Erro ao processar imagem'); });
+      } catch(ex) { toast('Nao foi possivel extrair a morada'); }
+    })
+    .catch(function() {
+      btn.classList.remove('loading'); btn.innerHTML = orig; input.value = '';
+      toast('Erro ao processar imagem');
+    });
   };
   reader.readAsDataURL(file);
 }
 
-// ════════════════════════════════════════════════════════
-// SUBMETER
-// ════════════════════════════════════════════════════════
+
 function submeterGuia() {
   if (S.artigos.length === 0) { toast('Adiciona pelo menos um artigo'); return; }
   var inicio = document.getElementById('inp-inicio').value;
