@@ -787,9 +787,8 @@ var S = {
 // ════════════════════════════════════════════════════════
 // ARRANQUE
 // ════════════════════════════════════════════════════════
-window.onload = function() {
+function iniciarApp() {
   definirDataDefault();
-  ligarEventos();
   // Carregar config (chave Gemini) e dados em paralelo
   apiGet('config').then(function(c) {
     if (c && c.geminiKey) GEMINI_KEY = c.geminiKey;
@@ -799,6 +798,11 @@ window.onload = function() {
     if (d && d.artigos)  S.catalogo_artigos  = d.artigos;
     if (d && d.clientes) S.catalogo_clientes = d.clientes;
   }).catch(function() {});
+}
+
+window.onload = function() {
+  ligarEventos();
+  // Dados e config carregados após PIN correcto — ver iniciarApp()
 }
 
 
